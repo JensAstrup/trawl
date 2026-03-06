@@ -1,0 +1,101 @@
+{
+  "name": "trawl",
+  "displayName": "Trawl - NPM Dependency Manager",
+  "description": "Zero-click outdated dependency warnings and version autocomplete for package.json",
+  "version": "0.1.0",
+  "publisher": "VoidWorks",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/VoidWorksIO/trawl"
+  },
+    "scripts": {
+    "vscode:prepublish": "npm run package",
+    "compile": "npm run check-types && node esbuild.js",
+    "check-types": "tsc --noEmit",
+    "watch": "node esbuild.js --watch",
+    "watch:esbuild": "node esbuild.js --watch",
+    "watch:tsc": "tsc --noEmit --watch --project tsconfig.json",
+    "package": "npm run check-types && node esbuild.js --production",
+    "lint": "eslint src --ext ts"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Linters",
+    "Other"
+  ],
+  "keywords": [
+    "npm",
+    "dependencies",
+    "outdated",
+    "package.json",
+    "version",
+    "semver"
+  ],
+  "icon": "assets/icon.png",
+  "activationEvents": [
+    "workspaceContains:**/package.json"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "npmDepManager.checkOutdated",
+        "title": "NPM: Check Outdated Dependencies"
+      },
+      {
+        "command": "npmDepManager.refreshCache",
+        "title": "NPM: Refresh Dependency Cache"
+      }
+    ],
+    "configuration": {
+      "title": "NPM Dependency Manager",
+      "properties": {
+        "npmDepManager.cacheTTLMinutes": {
+          "type": "number",
+          "default": 30,
+          "description": "How long (in minutes) to cache npm registry responses before refreshing."
+        },
+        "npmDepManager.enableDiagnostics": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable automatic outdated dependency diagnostics."
+        },
+        "npmDepManager.enableVersionAutocomplete": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable version string autocomplete from npm registry."
+        },
+        "npmDepManager.enableHover": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable hover information for dependencies."
+        },
+        "npmDepManager.concurrency": {
+          "type": "number",
+          "default": 6,
+          "description": "Number of concurrent npm registry requests."
+        },
+        "npmDepManager.ignoredPackages": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "description": "List of package names to ignore when checking for updates."
+        }
+      }
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/semver": "7.7.1",
+    "@types/vscode": "^1.85.0",
+    "esbuild": "^0.20.0",
+    "typescript": "^5.3.0"
+  },
+  "dependencies": {
+    "semver": "^7.6.0"
+  }
+}
