@@ -99,14 +99,22 @@ export async function getPackageInfo(packageName: string): Promise<NpmPackageInf
  */
 export async function prefetchPackages(
   packageNames: string[],
-  _concurrency: number = 6
+  concurrency: number = 6
 ): Promise<Map<string, NpmPackageInfo>> {
   const results = new Map<string, NpmPackageInfo>()
+  let nextIndex = 0
 
-  const infos = await Promise.all(packageNames.map(name => getPackageInfo(name)))
-  for (const [index, info] of infos.entries()) {
-    if (info) results.set(packageNames[index], info)
+  async function worker(): Promise<void> {
+    while (nextIndex < packageNames.length) {
+      const index = nextIndex++
+      const name = packageNames[index]
+      const info = await getPackageInfo(name)
+      if (info) results.set(name, info)
+    }
   }
+
+  const workerCount = Math.min(concurrency, packageNames.length)
+  await Promise.all(Array.from({ length: workerCount }, () => worker()))
   return results
 }
 

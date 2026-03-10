@@ -1,4 +1,4 @@
-## Project Overview
+# Project Overview
 
 Trawl is a VS Code extension that provides zero-click outdated dependency warnings and version autocomplete for `package.json` files. Outdated deps surface as native VS Code diagnostics (Problems panel, editor underlines, file explorer decorations) - no toolbar button, no sidebar required.
 
