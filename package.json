@@ -2,13 +2,13 @@
   "name": "trawl",
   "displayName": "Trawl - NPM Dependency Manager",
   "description": "Zero-click outdated dependency warnings and version autocomplete for package.json",
-  "version": "0.1.0",
-  "publisher": "VoidWorks",
+  "version": "0.1.1",
+  "publisher": "JensAstrup",
   "repository": {
     "type": "git",
-    "url": "https://github.com/VoidWorksIO/trawl"
+    "url": "https://github.com/JensAstrup/trawl"
   },
-    "scripts": {
+  "scripts": {
     "vscode:prepublish": "npm run package",
     "compile": "npm run check-types && node esbuild.js",
     "check-types": "tsc --noEmit",
@@ -16,7 +16,8 @@
     "watch:esbuild": "node esbuild.js --watch",
     "watch:tsc": "tsc --noEmit --watch --project tsconfig.json",
     "package": "npm run check-types && node esbuild.js --production",
-    "lint": "eslint src --ext ts"
+    "lint": "eslint src",
+    "test": "jest"
   },
   "engines": {
     "vscode": "^1.85.0"
@@ -41,43 +42,43 @@
   "contributes": {
     "commands": [
       {
-        "command": "npmDepManager.checkOutdated",
+        "command": "trawl.checkOutdated",
         "title": "NPM: Check Outdated Dependencies"
       },
       {
-        "command": "npmDepManager.refreshCache",
+        "command": "trawl.refreshCache",
         "title": "NPM: Refresh Dependency Cache"
       }
     ],
     "configuration": {
-      "title": "NPM Dependency Manager",
+      "title": "Trawl",
       "properties": {
-        "npmDepManager.cacheTTLMinutes": {
+        "trawl.cacheTTLMinutes": {
           "type": "number",
           "default": 30,
           "description": "How long (in minutes) to cache npm registry responses before refreshing."
         },
-        "npmDepManager.enableDiagnostics": {
+        "trawl.enableDiagnostics": {
           "type": "boolean",
           "default": true,
           "description": "Enable automatic outdated dependency diagnostics."
         },
-        "npmDepManager.enableVersionAutocomplete": {
+        "trawl.enableVersionAutocomplete": {
           "type": "boolean",
           "default": true,
           "description": "Enable version string autocomplete from npm registry."
         },
-        "npmDepManager.enableHover": {
+        "trawl.enableHover": {
           "type": "boolean",
           "default": true,
           "description": "Enable hover information for dependencies."
         },
-        "npmDepManager.concurrency": {
+        "trawl.concurrency": {
           "type": "number",
           "default": 6,
           "description": "Number of concurrent npm registry requests."
         },
-        "npmDepManager.ignoredPackages": {
+        "trawl.ignoredPackages": {
           "type": "array",
           "default": [],
           "items": {
@@ -89,13 +90,39 @@
     }
   },
   "devDependencies": {
-    "@types/node": "^20.11.0",
+    "@eslint/js": "10.0.1",
+    "@types/jest": "29.5.14",
+    "@types/node": "20.11.0",
     "@types/semver": "7.7.1",
-    "@types/vscode": "^1.85.0",
-    "esbuild": "^0.20.0",
-    "typescript": "^5.3.0"
+    "@types/vscode": "1.85.0",
+    "esbuild": "0.20.0",
+    "eslint": "10.0.2",
+    "eslint-config-yenz": "10.1.1",
+    "eslint-plugin-yenz": "2.1.1",
+    "jest": "29.7.0",
+    "ts-jest": "29.4.6",
+    "typescript": "5.8.3"
   },
   "dependencies": {
-    "semver": "^7.6.0"
+    "semver": "7.6.0"
+  },
+  "jest": {
+    "preset": "ts-jest",
+    "testEnvironment": "node",
+    "testMatch": [
+      "**/src/__tests__/**/*.test.ts"
+    ],
+    "moduleNameMapper": {
+      "^vscode$": "<rootDir>/src/__mocks__/vscode.ts"
+    }
+  },
+  "resolutions": {
+    "@typescript-eslint/eslint-plugin": "8.56.1",
+    "@typescript-eslint/parser": "8.56.1",
+    "@typescript-eslint/utils": "8.56.1",
+    "@typescript-eslint/types": "8.56.1",
+    "@typescript-eslint/typescript-estree": "8.56.1",
+    "@typescript-eslint/scope-manager": "8.56.1",
+    "@typescript-eslint/visitor-keys": "8.56.1"
   }
 }
