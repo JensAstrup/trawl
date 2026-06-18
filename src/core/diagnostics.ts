@@ -1,24 +1,23 @@
 /**
- * Diagnostics provider — the core differentiator.
- * Automatically analyzes open package.json files and reports
- * outdated dependencies as native VS Code diagnostics with
- * semver-aware severity levels.
+ * Diagnostics orchestrator — the core differentiator.
+ * Automatically analyzes open manifest files (npm package.json, Python
+ * requirements*.txt) and reports outdated dependencies as native VS Code
+ * diagnostics with update-aware severity levels. All format-specific work is
+ * delegated to the matched Ecosystem.
  */
 
 import * as vscode from 'vscode'
 
-import { parseDependencies, isPackageJson } from './parser'
-import { prefetchPackages, scheduleBackgroundRefresh } from './registry'
-import { analyzeVersion, suggestVersionUpdate } from './semver-utils'
-import { DependencyInfo, VersionAnalysis, NpmPackageInfo, TrawlDiagnostic } from './types'
+import { ECOSYSTEMS, ecosystemForDocument } from './ecosystem'
+import { DependencyInfo, VersionAnalysis, PackageInfo, TrawlDiagnostic, Ecosystem } from './types'
 
 /** Diagnostic collection for outdated deps */
 let diagnosticCollection: vscode.DiagnosticCollection
 
 /** Store analysis results for use by other providers (hover, code actions) */
-const analysisCache = new Map<string, Map<string, { dep: DependencyInfo; analysis: VersionAnalysis; info: NpmPackageInfo }>>()
+const analysisCache = new Map<string, Map<string, { dep: DependencyInfo; analysis: VersionAnalysis; info: PackageInfo }>>()
 
-export function getAnalysisCache(): Map<string, Map<string, { dep: DependencyInfo; analysis: VersionAnalysis; info: NpmPackageInfo }>> {
+export function getAnalysisCache(): Map<string, Map<string, { dep: DependencyInfo; analysis: VersionAnalysis; info: PackageInfo }>> {
   return analysisCache
 }
 
@@ -29,49 +28,43 @@ export function initDiagnostics(context: vscode.ExtensionContext): vscode.Diagno
   diagnosticCollection = vscode.languages.createDiagnosticCollection('trawl')
   context.subscriptions.push(diagnosticCollection)
 
-  // Analyze all currently open package.json files
+  // Analyze all currently open manifest files
   for (const editor of vscode.window.visibleTextEditors) {
-    if (isPackageJson(editor.document)) {
-      analyzeDocument(editor.document)
-    }
+    analyzeIfMatched(editor.document)
   }
 
-  // Watch for newly opened package.json files
+  // Watch for newly opened manifest files
   context.subscriptions.push(
     vscode.workspace.onDidOpenTextDocument((doc) => {
-      if (isPackageJson(doc)) {
-        analyzeDocument(doc)
-      }
+      analyzeIfMatched(doc)
     })
   )
 
-  // Watch for changes to package.json files (debounced)
+  // Watch for changes to manifest files (debounced)
   const DEBOUNCE_MS = 1000
   let changeTimer: ReturnType<typeof setTimeout> | undefined
   context.subscriptions.push(
     vscode.workspace.onDidChangeTextDocument((event) => {
-      if (isPackageJson(event.document)) {
-        if (changeTimer) clearTimeout(changeTimer)
-        changeTimer = setTimeout(() => {
-          analyzeDocument(event.document)
-        }, DEBOUNCE_MS)
-      }
+      const ecosystem = ecosystemForDocument(event.document)
+      if (!ecosystem) return
+      if (changeTimer) clearTimeout(changeTimer)
+      changeTimer = setTimeout(() => {
+        analyzeDocument(event.document, ecosystem)
+      }, DEBOUNCE_MS)
     })
   )
 
-  // Watch for saved package.json files
+  // Watch for saved manifest files
   context.subscriptions.push(
     vscode.workspace.onDidSaveTextDocument((doc) => {
-      if (isPackageJson(doc)) {
-        analyzeDocument(doc)
-      }
+      analyzeIfMatched(doc)
     })
   )
 
   // Clean up diagnostics when a file is closed
   context.subscriptions.push(
     vscode.workspace.onDidCloseTextDocument((doc) => {
-      if (isPackageJson(doc)) {
+      if (ecosystemForDocument(doc)) {
         diagnosticCollection.delete(doc.uri)
         analysisCache.delete(doc.uri.toString())
       }
@@ -81,84 +74,82 @@ export function initDiagnostics(context: vscode.ExtensionContext): vscode.Diagno
   // Watch for workspace folder changes (monorepo support)
   context.subscriptions.push(
     vscode.workspace.onDidChangeWorkspaceFolders(() => {
-      scanWorkspaceForPackageJson()
+      scanWorkspace()
     })
   )
 
   // Initial workspace scan
-  scanWorkspaceForPackageJson()
+  scanWorkspace()
 
   return diagnosticCollection
 }
 
+function analyzeIfMatched(document: vscode.TextDocument): void {
+  const ecosystem = ecosystemForDocument(document)
+  if (ecosystem) analyzeDocument(document, ecosystem)
+}
+
 /**
- * Scan the workspace for all package.json files and analyze them.
- * Provides monorepo support by finding all package.json files.
+ * Scan the workspace for all supported manifest files and analyze them.
+ * Provides monorepo support by finding every manifest per ecosystem.
  */
-async function scanWorkspaceForPackageJson(): Promise<void> {
+async function scanWorkspace(): Promise<void> {
   const config = vscode.workspace.getConfiguration('trawl')
   if (!config.get<boolean>('enableDiagnostics', true)) return
 
-  const MAX_PACKAGE_JSON_SEARCH = 50
-  const files = await vscode.workspace.findFiles('**/package.json', '**/node_modules/**', MAX_PACKAGE_JSON_SEARCH)
-  for (const file of files) {
-    try {
-      const doc = await vscode.workspace.openTextDocument(file)
-      analyzeDocument(doc)
-    }
-    catch {
-      // Skip files that can't be opened
+  const MAX_FILE_SEARCH = 50
+  for (const ecosystem of ECOSYSTEMS) {
+    const files = await vscode.workspace.findFiles(
+      ecosystem.workspaceGlob,
+      ecosystem.workspaceExcludeGlob ?? undefined,
+      MAX_FILE_SEARCH
+    )
+    for (const file of files) {
+      try {
+        const doc = await vscode.workspace.openTextDocument(file)
+        analyzeDocument(doc, ecosystem)
+      }
+      catch {
+        // Skip files that can't be opened
+      }
     }
   }
 }
 
 /**
- * Analyze a single package.json document and set diagnostics.
+ * Analyze a single manifest document and set diagnostics.
  */
-async function analyzeDocument(document: vscode.TextDocument): Promise<void> {
+async function analyzeDocument(document: vscode.TextDocument, ecosystem: Ecosystem): Promise<void> {
   const config = vscode.workspace.getConfiguration('trawl')
   if (!config.get<boolean>('enableDiagnostics', true)) return
 
   const ignoredPackages = config.get<string[]>('ignoredPackages', [])
   const concurrency = config.get<number>('concurrency', 6)
 
-  const deps = parseDependencies(document)
+  const deps = ecosystem.parseDependencies(document)
   if (deps.length === 0) {
     diagnosticCollection.set(document.uri, [])
     return
   }
 
-  // Filter out ignored packages
-  const filteredDeps = deps.filter((d) => !ignoredPackages.includes(d.name))
+  // Filter out ignored packages and non-comparable references
+  const filteredDeps = deps.filter((d) => !ignoredPackages.includes(d.name) && !ecosystem.shouldSkip(d))
   const packageNames = [...new Set(filteredDeps.map((d) => d.name))]
 
   // Prefetch all packages concurrently
-  const packageInfoMap = await prefetchPackages(packageNames, concurrency)
+  const packageInfoMap = await ecosystem.prefetchPackages(packageNames, concurrency)
 
   // Schedule background refresh for next time
-  scheduleBackgroundRefresh(packageNames)
+  ecosystem.scheduleBackgroundRefresh(packageNames)
 
   const diagnostics: vscode.Diagnostic[] = []
-  const docAnalysis = new Map<string, { dep: DependencyInfo; analysis: VersionAnalysis; info: NpmPackageInfo }>()
+  const docAnalysis = new Map<string, { dep: DependencyInfo; analysis: VersionAnalysis; info: PackageInfo }>()
 
   for (const dep of filteredDeps) {
     const info = packageInfoMap.get(dep.name)
     if (!info) continue
 
-    // Skip packages that appear to be local/workspace references
-    if (
-      dep.versionRange.startsWith('file:') ||
-      dep.versionRange.startsWith('link:') ||
-      dep.versionRange.startsWith('workspace:') ||
-      dep.versionRange.startsWith('git') ||
-      dep.versionRange.startsWith('http') ||
-      dep.versionRange === '*' ||
-      dep.versionRange === 'latest'
-    ) {
-      continue
-    }
-
-    const analysis = analyzeVersion(dep.versionRange, info)
+    const analysis = ecosystem.analyzeVersion(dep.versionRange, info)
 
     // Store for hover/code action providers
     docAnalysis.set(dep.name, { dep, analysis, info })
@@ -167,9 +158,9 @@ async function analyzeDocument(document: vscode.TextDocument): Promise<void> {
       continue
     }
 
-    // Create diagnostic with semver-aware severity
+    // Create diagnostic with update-aware severity
     const severity = getSeverity(analysis.updateType)
-    const suggested = suggestVersionUpdate(dep.versionRange, analysis.latest)
+    const suggested = ecosystem.suggestVersionUpdate(dep.versionRange, analysis.latest)
 
     const range = new vscode.Range(
       dep.line,
@@ -178,13 +169,13 @@ async function analyzeDocument(document: vscode.TextDocument): Promise<void> {
       dep.versionEndChar
     )
 
-    const message = formatDiagnosticMessage(dep, analysis, suggested)
+    const message = formatDiagnosticMessage(dep, analysis)
 
     const diagnostic = new vscode.Diagnostic(range, message, severity)
     diagnostic.source = 'trawl'
     diagnostic.code = {
       value: analysis.updateType,
-      target: vscode.Uri.parse(info.npmUrl),
+      target: vscode.Uri.parse(ecosystem.packageUrl(dep.name)),
     };
 
     // Store metadata for quick-fix code actions
@@ -223,8 +214,7 @@ function getSeverity(updateType: string): vscode.DiagnosticSeverity {
  */
 function formatDiagnosticMessage(
   dep: DependencyInfo,
-  analysis: VersionAnalysis,
-  _suggested: string
+  analysis: VersionAnalysis
 ): string {
   const updateLabel = analysis.updateType.charAt(0).toUpperCase() + analysis.updateType.slice(1)
   let msg = `${updateLabel} update available for ${dep.name}: ${analysis.latest}`
@@ -237,15 +227,16 @@ function formatDiagnosticMessage(
 }
 
 /**
- * Force re-analysis of all open package.json documents.
+ * Force re-analysis of all open manifest documents.
  * Used by the "Refresh Cache" command.
  */
 export async function refreshAllDiagnostics(): Promise<void> {
   for (const editor of vscode.window.visibleTextEditors) {
-    if (isPackageJson(editor.document)) {
-      await analyzeDocument(editor.document)
+    const ecosystem = ecosystemForDocument(editor.document)
+    if (ecosystem) {
+      await analyzeDocument(editor.document, ecosystem)
     }
   }
   // Also re-scan workspace
-  await scanWorkspaceForPackageJson()
+  await scanWorkspace()
 }

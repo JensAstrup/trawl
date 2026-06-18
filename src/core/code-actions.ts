@@ -1,11 +1,12 @@
 /**
- * Code Action provider — offers quick-fix actions to update
- * dependency versions directly in the editor.
+ * Code Action provider — offers quick-fix actions to update dependency
+ * versions directly in the editor. Works for any ecosystem via the
+ * TrawlDiagnostic metadata attached during analysis.
  */
 
 import * as vscode from 'vscode'
 
-import { isPackageJson } from './parser'
+import { ecosystemForDocument } from './ecosystem'
 import { TrawlDiagnostic } from './types'
 
 
@@ -18,7 +19,8 @@ export class VersionQuickFixProvider implements vscode.CodeActionProvider {
     context: vscode.CodeActionContext,
     _token: vscode.CancellationToken
   ): vscode.CodeAction[] {
-    if (!isPackageJson(document)) return []
+    const ecosystem = ecosystemForDocument(document)
+    if (!ecosystem) return []
 
     const actions: vscode.CodeAction[] = []
 
@@ -31,7 +33,7 @@ export class VersionQuickFixProvider implements vscode.CodeActionProvider {
 
       if (!depName || !latestVersion) continue
 
-      // Action: Update to latest version (preserving prefix)
+      // Action: Update to latest version (preserving prefix/operator)
       if (suggestedVersion) {
         const updateToLatest = new vscode.CodeAction(
           `Update ${depName} to ${suggestedVersion}`,
@@ -46,29 +48,30 @@ export class VersionQuickFixProvider implements vscode.CodeActionProvider {
 
       // Action: Pin to exact latest version
       {
+        const pinned = ecosystem.id === 'python' ? `==${latestVersion}` : latestVersion
         const pinToLatest = new vscode.CodeAction(
           `Pin ${depName} to exact ${latestVersion}`,
           vscode.CodeActionKind.QuickFix
         )
         pinToLatest.edit = new vscode.WorkspaceEdit()
-        pinToLatest.edit.replace(document.uri, diagnostic.range, latestVersion)
+        pinToLatest.edit.replace(document.uri, diagnostic.range, pinned)
         pinToLatest.diagnostics = [diagnostic]
         actions.push(pinToLatest)
       }
 
-      // Action: Open npm page
+      // Action: Open the registry page
       {
-        const openNpm = new vscode.CodeAction(
-          `Open ${depName} on npm`,
+        const openPage = new vscode.CodeAction(
+          `Open ${depName} on ${ecosystem.registryName}`,
           vscode.CodeActionKind.QuickFix
         )
-        openNpm.command = {
-          title: `Open ${depName} on npm`,
+        openPage.command = {
+          title: `Open ${depName} on ${ecosystem.registryName}`,
           command: 'vscode.open',
-          arguments: [vscode.Uri.parse(`https://www.npmjs.com/package/${depName}`)],
+          arguments: [vscode.Uri.parse(ecosystem.packageUrl(depName))],
         }
-        openNpm.diagnostics = [diagnostic]
-        actions.push(openNpm)
+        openPage.diagnostics = [diagnostic]
+        actions.push(openPage)
       }
     }
 
