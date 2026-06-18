@@ -120,7 +120,7 @@ export function getDependencyAtVersion(
     (dep) =>
       dep.line === position.line &&
       position.character >= dep.versionStartChar &&
-      position.character <= dep.versionEndChar
+      position.character < dep.versionEndChar
   )
 }
 
@@ -134,6 +134,6 @@ export function getDependencyAtName(
     (dep) =>
       dep.line === position.line &&
       position.character >= dep.nameStartChar &&
-      position.character <= dep.nameEndChar
+      position.character < dep.nameEndChar
   )
 }

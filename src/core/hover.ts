@@ -38,7 +38,12 @@ export class DependencyHoverProvider implements vscode.HoverProvider {
     let analysis = cachedEntry?.analysis
 
     if (!info) {
-      info = await ecosystem.getPackageInfo(dep.name) ?? undefined
+      try {
+        info = await ecosystem.getPackageInfo(dep.name) ?? undefined
+      }
+      catch {
+        return undefined
+      }
       if (!info) return undefined
       analysis = ecosystem.analyzeVersion(dep.versionRange, info)
     }

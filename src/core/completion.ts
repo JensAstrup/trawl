@@ -29,7 +29,13 @@ export class VersionCompletionProvider implements vscode.CompletionItemProvider 
     if (!dep) return undefined
 
     // Fetch available versions for this package
-    const packageInfo = await ecosystem.getPackageInfo(dep.name)
+    let packageInfo
+    try {
+      packageInfo = await ecosystem.getPackageInfo(dep.name)
+    }
+    catch {
+      return undefined
+    }
     if (!packageInfo || packageInfo.versions.length === 0) return undefined
 
     // The replacement range is the entire version string

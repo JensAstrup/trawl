@@ -97,6 +97,13 @@ export function suggestVersionUpdate(
 
   const operatorMatch = currentRange.match(OPERATOR)
   const operator = operatorMatch ? operatorMatch[1] : '=='
+
+  // Exclusion/upper-bound operators would still exclude the target, so pin exactly.
+  const operatorsThatStillIncludeTarget = new Set(['==', '===', '>=', '~='])
+  if (!operatorsThatStillIncludeTarget.has(operator)) {
+    return `==${targetVersion}`
+  }
+
   return `${operator}${targetVersion}`
 }
 

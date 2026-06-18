@@ -84,6 +84,9 @@ export function createRegistryCache(options: RegistryCacheOptions): RegistryCach
   ): Promise<Map<string, PackageInfo>> {
     const results = new Map<string, PackageInfo>()
     let nextIndex = 0
+    const safeConcurrency = Number.isFinite(concurrency) && concurrency > 0
+      ? Math.floor(concurrency)
+      : 1
 
     async function worker(): Promise<void> {
       if (nextIndex >= names.length) return
@@ -94,7 +97,7 @@ export function createRegistryCache(options: RegistryCacheOptions): RegistryCach
       return worker()
     }
 
-    const workerCount = Math.min(concurrency, names.length)
+    const workerCount = Math.min(safeConcurrency, names.length)
     await Promise.all(Array.from({ length: workerCount }, () => worker()))
     return results
   }

@@ -120,6 +120,7 @@ export interface Ecosystem {
 
 const HttpStatusCode = {
   OK: 200,
+  MULTIPLE_CHOICES: 300,
   BAD_REQUEST: 400,
   UNAUTHORIZED: 401,
   FORBIDDEN: 403,

@@ -61,18 +61,18 @@ export function buildCompletionItems(
     items.push(lowerBoundItem)
   }
 
-  const versionItems = sortedVersions.slice(0, MAX_VERSIONS).map((version, index) => {
-    const publishDate = info.time[version]
-    const item = new vscode.CompletionItem(`==${version}`, vscode.CompletionItemKind.Value)
-    item.detail = publishDate ? new Date(publishDate).toLocaleDateString() : undefined
-    item.sortText = `1-${String(index).padStart(4, '0')}`
-    item.range = replaceRange
-    item.filterText = version
-    if (version === latest) {
-      item.detail = `${item.detail ?? ''} ★ latest`.trim()
-    }
-    return item
-  })
+  const versionItems = sortedVersions
+    .filter((version) => version !== latest)
+    .slice(0, MAX_VERSIONS)
+    .map((version, index) => {
+      const publishDate = info.time[version]
+      const item = new vscode.CompletionItem(`==${version}`, vscode.CompletionItemKind.Value)
+      item.detail = publishDate ? new Date(publishDate).toLocaleDateString() : undefined
+      item.sortText = `1-${String(index).padStart(4, '0')}`
+      item.range = replaceRange
+      item.filterText = version
+      return item
+    })
   items.push(...versionItems)
 
   return items

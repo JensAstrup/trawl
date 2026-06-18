@@ -24,10 +24,12 @@ Press **F5** in VS Code to launch the Extension Development Host with the extens
 - Node.js `https` module for registry HTTP requests (no fetch, no axios)
 
 ### Key Directory Structure
+
 The code is split into an ecosystem-agnostic **core** and one self-contained
 folder per ecosystem (`npm`, `python`). Core orchestration and providers never
 reference npm/PyPI directly — they go through the `Ecosystem` interface.
-```
+
+```text
 src/
 ├── extension.ts            # Entry point - registers providers per ecosystem
 ├── core/
@@ -47,6 +49,7 @@ To add an ecosystem: create `src/<name>/` implementing the pieces, export an
 `Ecosystem` from its `index.ts`, and add it to `ECOSYSTEMS` in `core/ecosystem.ts`.
 
 ### Core Features
+
 - **Diagnostics**: Severity mapped to update type - major=Error, minor=Warning, patch=Info, prerelease=Hint
 - **Completion**: Real registry versions newest-first; npm offers `^`/exact/`~`/dist-tags, Python offers `==`/`>=`
 - **Hover**: Markdown table with current, max satisfying, latest, publish date, and registry links
@@ -54,14 +57,17 @@ To add an ecosystem: create `src/<name>/` implementing the pieces, export an
 - **Caching**: In-memory TTL cache with inflight deduplication and background refresh at 80% TTL (shared `registry-cache` factory, one instance per ecosystem)
 
 ### Import Paths
+
 Uses relative imports - no path aliases. Core imports from `./` within `core/`;
 ecosystem modules import the core via `../core/*`. Example:
+
 ```ts
 import { createRegistryCache } from '../core/registry-cache'
 import { PackageInfo } from '../core/types'
 ```
 
 ### Configuration Namespace
+
 All VS Code settings use the `trawl.*` prefix (e.g. `trawl.cacheTTLMinutes`). When reading config, always use `vscode.workspace.getConfiguration('trawl')`.
 
 ## Testing Strategy

@@ -19,7 +19,7 @@ describe('parseRequirements', () => {
     const deps = parseRequirements(
       ['a==1.0', 'b>=1.0', 'c<=1.0', 'd~=1.0', 'e!=1.0', 'f>1.0', 'g<1.0', 'h===1.0'].join('\n')
     )
-    expect(deps.map((d) => d.versionRange)).toEqual([
+    expect(deps.map((dependency) => dependency.versionRange)).toEqual([
       '==1.0', '>=1.0', '<=1.0', '~=1.0', '!=1.0', '>1.0', '<1.0', '===1.0',
     ])
   })
@@ -60,7 +60,7 @@ describe('parseRequirements', () => {
       'requests==2.31.0',
     ].join('\n')
     const deps = parseRequirements(text)
-    expect(deps.map((d) => d.name)).toEqual(['requests'])
+    expect(deps.map((dependency) => dependency.name)).toEqual(['requests'])
   })
 
   it('skips URL, VCS and PEP 508 direct references', () => {
@@ -78,7 +78,7 @@ describe('parseRequirements', () => {
 
   it('reports the correct line numbers across a file', () => {
     const deps = parseRequirements(['# header', 'requests==2.0.0', '', 'flask>=1.0'].join('\n'))
-    expect(deps.map((d) => [d.name, d.line])).toEqual([
+    expect(deps.map((dependency) => [dependency.name, dependency.line])).toEqual([
       ['requests', 1],
       ['flask', 3],
     ])

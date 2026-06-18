@@ -64,4 +64,11 @@ describe('suggestVersionUpdate (PEP 440)', () => {
   it('collapses compound specifiers to an exact pin', () => {
     expect(suggestVersionUpdate('>=4.0,<5.0', '5.2.0')).toBe('==5.2.0')
   })
+
+  it('pins exactly for exclusion and upper-bound operators', () => {
+    expect(suggestVersionUpdate('!=1.0.0', '2.0.0')).toBe('==2.0.0')
+    expect(suggestVersionUpdate('<2.0.0', '2.0.0')).toBe('==2.0.0')
+    expect(suggestVersionUpdate('<=2.0.0', '2.0.0')).toBe('==2.0.0')
+    expect(suggestVersionUpdate('>1.0.0', '2.0.0')).toBe('==2.0.0')
+  })
 })

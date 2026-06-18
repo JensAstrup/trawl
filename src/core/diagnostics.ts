@@ -40,17 +40,23 @@ export function initDiagnostics(context: vscode.ExtensionContext): vscode.Diagno
     })
   )
 
-  // Watch for changes to manifest files (debounced)
+  // Watch for changes to manifest files (debounced per document)
   const DEBOUNCE_MS = 1000
-  let changeTimer: ReturnType<typeof setTimeout> | undefined
+  const changeTimers = new Map<string, ReturnType<typeof setTimeout>>()
   context.subscriptions.push(
     vscode.workspace.onDidChangeTextDocument((event) => {
       const ecosystem = ecosystemForDocument(event.document)
       if (!ecosystem) return
-      if (changeTimer) clearTimeout(changeTimer)
-      changeTimer = setTimeout(() => {
-        analyzeDocument(event.document, ecosystem)
+      const documentUri = event.document.uri.toString()
+      const existingTimer = changeTimers.get(documentUri)
+      if (existingTimer) clearTimeout(existingTimer)
+      const timer = setTimeout(() => {
+        analyzeDocument(event.document, ecosystem).catch(() => {
+          // Keep the change watcher resilient to analysis failures
+        })
+        changeTimers.delete(documentUri)
       }, DEBOUNCE_MS)
+      changeTimers.set(documentUri, timer)
     })
   )
 
@@ -106,11 +112,11 @@ async function scanWorkspace(): Promise<void> {
     )
     for (const file of files) {
       try {
-        const doc = await vscode.workspace.openTextDocument(file)
-        analyzeDocument(doc, ecosystem)
+        const document = await vscode.workspace.openTextDocument(file)
+        await analyzeDocument(document, ecosystem)
       }
       catch {
-        // Skip files that can't be opened
+        // Skip files that can't be opened or analyzed
       }
     }
   }

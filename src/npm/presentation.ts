@@ -35,10 +35,29 @@ export function shouldSkip(dep: DependencyInfo): boolean {
 
 export function hoverLinks(info: PackageInfo): string {
   let links = `[npm](${info.registryUrl})`
-  if (info.homepage && info.homepage !== info.registryUrl) {
-    links += ` · [Homepage](${info.homepage})`
+  const homepage = sanitizeExternalHttpUrl(info.homepage)
+  if (homepage && homepage !== info.registryUrl) {
+    links += ` · [Homepage](${homepage})`
   }
   return links
+}
+
+/**
+ * Only allow http/https homepage URLs into trusted hover markdown, guarding
+ * against javascript:/data: and other unsafe schemes from registry metadata.
+ */
+function sanitizeExternalHttpUrl(value?: string): string | undefined {
+  if (!value) return undefined
+  try {
+    const parsed = new URL(value)
+    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+      return parsed.toString()
+    }
+  }
+  catch {
+    // Ignore invalid URLs
+  }
+  return undefined
 }
 
 export function buildCompletionItems(

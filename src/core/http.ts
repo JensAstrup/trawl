@@ -39,8 +39,9 @@ export function fetchJson<T>(url: string, options: FetchJsonOptions = {}): Promi
           return
         }
 
-        if (res.statusCode && res.statusCode >= HttpStatusCode.BAD_REQUEST) {
-          reject(new Error(`Request returned ${res.statusCode} for ${url}`))
+        const statusCode = res.statusCode ?? 0
+        if (statusCode < HttpStatusCode.OK || statusCode >= HttpStatusCode.MULTIPLE_CHOICES) {
+          reject(new Error(`Request returned ${statusCode} for ${url}`))
           return
         }
 
