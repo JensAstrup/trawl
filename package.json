@@ -1,9 +1,9 @@
 {
   "name": "trawl",
-  "displayName": "Trawl - NPM Dependency Manager",
-  "description": "Zero-click outdated dependency warnings and version autocomplete for package.json",
-  "version": "0.1.1",
-  "publisher": "JensAstrup",
+  "displayName": "Trawl - Dependency Manager",
+  "description": "Zero-click outdated dependency warnings and version autocomplete for package.json (npm) and requirements.txt (PyPI)",
+  "version": "1.0.0",
+  "publisher": "VoidWorks",
   "repository": {
     "type": "git",
     "url": "https://github.com/JensAstrup/trawl"
@@ -17,7 +17,8 @@
     "watch:tsc": "tsc --noEmit --watch --project tsconfig.json",
     "package": "npm run check-types && node esbuild.js --production",
     "lint": "eslint src",
-    "test": "jest"
+    "test": "jest",
+    "publish": "vsce package && vsce publish"
   },
   "engines": {
     "vscode": "^1.85.0"
@@ -28,26 +29,30 @@
   ],
   "keywords": [
     "npm",
+    "pypi",
+    "python",
     "dependencies",
     "outdated",
     "package.json",
+    "requirements.txt",
     "version",
     "semver"
   ],
   "icon": "assets/icon.png",
   "activationEvents": [
-    "workspaceContains:**/package.json"
+    "workspaceContains:**/package.json",
+    "workspaceContains:**/requirements*.txt"
   ],
   "main": "./dist/extension.js",
   "contributes": {
     "commands": [
       {
         "command": "trawl.checkOutdated",
-        "title": "NPM: Check Outdated Dependencies"
+        "title": "Trawl: Check Outdated Dependencies"
       },
       {
         "command": "trawl.refreshCache",
-        "title": "NPM: Refresh Dependency Cache"
+        "title": "Trawl: Refresh Dependency Cache"
       }
     ],
     "configuration": {
@@ -56,7 +61,7 @@
         "trawl.cacheTTLMinutes": {
           "type": "number",
           "default": 30,
-          "description": "How long (in minutes) to cache npm registry responses before refreshing."
+          "description": "How long (in minutes) to cache registry responses before refreshing."
         },
         "trawl.enableDiagnostics": {
           "type": "boolean",
@@ -66,7 +71,7 @@
         "trawl.enableVersionAutocomplete": {
           "type": "boolean",
           "default": true,
-          "description": "Enable version string autocomplete from npm registry."
+          "description": "Enable version string autocomplete from the package registry."
         },
         "trawl.enableHover": {
           "type": "boolean",
@@ -76,7 +81,7 @@
         "trawl.concurrency": {
           "type": "number",
           "default": 6,
-          "description": "Number of concurrent npm registry requests."
+          "description": "Number of concurrent registry requests."
         },
         "trawl.ignoredPackages": {
           "type": "array",
@@ -95,22 +100,38 @@
     "@types/node": "20.11.0",
     "@types/semver": "7.7.1",
     "@types/vscode": "1.85.0",
+    "@vscode/vsce": "2.29.0",
     "esbuild": "0.20.0",
     "eslint": "10.0.2",
     "eslint-config-yenz": "10.1.1",
     "eslint-plugin-yenz": "2.1.1",
     "jest": "29.7.0",
+    "jest-util": "29.7.0",
     "ts-jest": "29.4.6",
     "typescript": "5.8.3"
   },
   "dependencies": {
+    "@renovatebot/pep440": "5.0.0",
     "semver": "7.6.0"
   },
   "jest": {
     "preset": "ts-jest",
     "testEnvironment": "node",
     "testMatch": [
-      "**/src/__tests__/**/*.test.ts"
+      "**/__tests__/**/*.test.ts"
+    ],
+    "transform": {
+      "^.+\\.[tj]s$": [
+        "ts-jest",
+        {
+          "tsconfig": {
+            "allowJs": true
+          }
+        }
+      ]
+    },
+    "transformIgnorePatterns": [
+      "/node_modules/(?!@renovatebot/pep440/)"
     ],
     "moduleNameMapper": {
       "^vscode$": "<rootDir>/src/__mocks__/vscode.ts"
@@ -124,5 +145,6 @@
     "@typescript-eslint/typescript-estree": "8.56.1",
     "@typescript-eslint/scope-manager": "8.56.1",
     "@typescript-eslint/visitor-keys": "8.56.1"
-  }
+  },
+  "packageManager": "yarn@4.12.0+sha512.f45ab632439a67f8bc759bf32ead036a1f413287b9042726b7cc4818b7b49e14e9423ba49b18f9e06ea4941c1ad062385b1d8760a8d5091a1a31e5f6219afca8"
 }

@@ -1,11 +1,11 @@
 /**
- * Semver analysis utilities.
+ * Semver analysis utilities for npm packages.
  * Determines what kind of update is available for a dependency.
  */
 
 import * as semver from 'semver'
 
-import { NpmPackageInfo, VersionAnalysis } from './types'
+import { PackageInfo, VersionAnalysis } from '../core/types'
 
 /**
  * Analyze a dependency's version range against the available versions
@@ -13,9 +13,9 @@ import { NpmPackageInfo, VersionAnalysis } from './types'
  */
 export function analyzeVersion(
   versionRange: string,
-  packageInfo: NpmPackageInfo
+  packageInfo: PackageInfo
 ): VersionAnalysis {
-  const latest = packageInfo.distTags.latest || ''
+  const latest = packageInfo.latest || ''
 
   // Clean versions — filter out pre-releases for max-satisfying unless the range itself includes pre-release
   const stableVersions = packageInfo.versions.filter((v) => {

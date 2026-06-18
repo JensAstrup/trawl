@@ -1,21 +1,16 @@
 /**
  * Extension entry point.
- * Wires together all providers and commands.
+ * Wires together all providers and commands across every ecosystem.
  */
 
 import * as vscode from 'vscode'
 
-import { VersionQuickFixProvider } from './code-actions'
-import { VersionCompletionProvider } from './completion'
-import { initDiagnostics, refreshAllDiagnostics } from './diagnostics'
-import { DependencyHoverProvider } from './hover'
-import { clearCache, setCacheTTL } from './registry'
+import { VersionQuickFixProvider } from './core/code-actions'
+import { VersionCompletionProvider } from './core/completion'
+import { initDiagnostics, refreshAllDiagnostics } from './core/diagnostics'
+import { ECOSYSTEMS } from './core/ecosystem'
+import { DependencyHoverProvider } from './core/hover'
 
-
-const DOCUMENT_SELECTOR: vscode.DocumentSelector = {
-  language: 'json',
-  pattern: '**/package.json',
-}
 
 export function activate(context: vscode.ExtensionContext): void {
   // Apply initial configuration
@@ -24,31 +19,35 @@ export function activate(context: vscode.ExtensionContext): void {
   // Initialize diagnostics (zero-click warnings)
   initDiagnostics(context)
 
-  // Register completion provider (trigger on quotes and digits for version editing)
-  context.subscriptions.push(
-    vscode.languages.registerCompletionItemProvider(
-      DOCUMENT_SELECTOR,
-      new VersionCompletionProvider(),
-      '"', '.', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '^', '~'
-    )
-  )
+  const completionProvider = new VersionCompletionProvider()
+  const hoverProvider = new DependencyHoverProvider()
+  const codeActionProvider = new VersionQuickFixProvider()
 
-  // Register hover provider
-  context.subscriptions.push(
-    vscode.languages.registerHoverProvider(
-      DOCUMENT_SELECTOR,
-      new DependencyHoverProvider()
+  // Register providers once per ecosystem using its document selector
+  for (const ecosystem of ECOSYSTEMS) {
+    context.subscriptions.push(
+      vscode.languages.registerCompletionItemProvider(
+        ecosystem.documentSelector,
+        completionProvider,
+        ...ecosystem.completionTriggerCharacters
+      )
     )
-  )
 
-  // Register code action provider (quick-fix)
-  context.subscriptions.push(
-    vscode.languages.registerCodeActionsProvider(
-      DOCUMENT_SELECTOR,
-      new VersionQuickFixProvider(),
-      { providedCodeActionKinds: VersionQuickFixProvider.providedCodeActionKinds }
+    context.subscriptions.push(
+      vscode.languages.registerHoverProvider(
+        ecosystem.documentSelector,
+        hoverProvider
+      )
     )
-  )
+
+    context.subscriptions.push(
+      vscode.languages.registerCodeActionsProvider(
+        ecosystem.documentSelector,
+        codeActionProvider,
+        { providedCodeActionKinds: VersionQuickFixProvider.providedCodeActionKinds }
+      )
+    )
+  }
 
   // Register commands
   context.subscriptions.push(
@@ -60,7 +59,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
   context.subscriptions.push(
     vscode.commands.registerCommand('trawl.refreshCache', async () => {
-      clearCache()
+      for (const ecosystem of ECOSYSTEMS) ecosystem.clearCache()
       await refreshAllDiagnostics()
       vscode.window.showInformationMessage('Trawl: Cache cleared and dependencies refreshed.')
     })
@@ -75,7 +74,6 @@ export function activate(context: vscode.ExtensionContext): void {
       }
     })
   )
-
 }
 
 const DEFAULT_CACHE_TTL_MINUTES = 30
@@ -83,7 +81,7 @@ const DEFAULT_CACHE_TTL_MINUTES = 30
 function applyConfig(): void {
   const config = vscode.workspace.getConfiguration('trawl')
   const ttl = config.get<number>('cacheTTLMinutes', DEFAULT_CACHE_TTL_MINUTES)
-  setCacheTTL(ttl)
+  for (const ecosystem of ECOSYSTEMS) ecosystem.setCacheTTL(ttl)
 }
 
 export function deactivate(): void {

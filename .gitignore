@@ -5,3 +5,12 @@
 dist/
 node_modules
 
+# Yarn (Plug'n'Play) generated artifacts
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/releases
+!.yarn/plugins
+!.yarn/sdks
+!.yarn/versions
+
