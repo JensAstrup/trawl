@@ -10,7 +10,7 @@ import * as vscode from 'vscode'
 import { DependencyInfo, PackageInfo } from '../core/types'
 
 
-const MAX_VERSIONS = 30
+export const MAX_VERSIONS = 30
 
 export function packageUrl(name: string): string {
   return `https://www.npmjs.com/package/${name}`

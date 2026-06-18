@@ -3,7 +3,7 @@
   "displayName": "Trawl - Dependency Manager",
   "description": "Zero-click outdated dependency warnings and version autocomplete for package.json (npm) and requirements.txt (PyPI)",
   "version": "1.0.0",
-  "publisher": "JensAstrup",
+  "publisher": "VoidWorks",
   "repository": {
     "type": "git",
     "url": "https://github.com/JensAstrup/trawl"
@@ -17,7 +17,8 @@
     "watch:tsc": "tsc --noEmit --watch --project tsconfig.json",
     "package": "npm run check-types && node esbuild.js --production",
     "lint": "eslint src",
-    "test": "jest"
+    "test": "jest",
+    "publish": "vsce package && vsce publish"
   },
   "engines": {
     "vscode": "^1.85.0"
@@ -99,9 +100,11 @@
     "@types/node": "20.11.0",
     "@types/semver": "7.7.1",
     "@types/vscode": "1.85.0",
+    "@vscode/vsce": "2.29.0",
     "esbuild": "0.20.0",
     "eslint": "10.0.2",
     "eslint-config-yenz": "10.1.1",
+    "eslint-plugin-yenz": "2.1.1",
     "jest": "29.7.0",
     "jest-util": "29.7.0",
     "ts-jest": "29.4.6",
