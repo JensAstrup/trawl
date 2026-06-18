@@ -18,7 +18,7 @@
     "package": "npm run check-types && node esbuild.js --production",
     "lint": "eslint src",
     "test": "jest",
-    "publish": "vsce package && vsce publish"
+    "publish": "vsce package --no-dependencies && vsce publish --no-dependencies"
   },
   "engines": {
     "vscode": "^1.85.0"
