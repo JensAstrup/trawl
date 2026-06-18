@@ -5,7 +5,21 @@
 
 import * as vscode from 'vscode'
 
-import { DependencyInfo, DependencyGroup, DEPENDENCY_GROUPS } from './types'
+import { DependencyInfo } from '../core/types'
+
+
+export type DependencyGroup =
+  | 'dependencies'
+  | 'devDependencies'
+  | 'peerDependencies'
+  | 'optionalDependencies';
+
+export const DEPENDENCY_GROUPS: DependencyGroup[] = [
+  'dependencies',
+  'devDependencies',
+  'peerDependencies',
+  'optionalDependencies',
+]
 
 /**
  * Parse a package.json TextDocument and extract all dependency entries

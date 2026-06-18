@@ -1,15 +1,13 @@
 /**
  * Hover provider — shows dependency information on hover.
- * Displays current version, latest version, last publish date,
- * and a link to the npm page.
+ * Displays current version, latest version, last publish date, and a link to
+ * the package's registry page. Format-specific links come from the ecosystem.
  */
 
 import * as vscode from 'vscode'
 
 import { getAnalysisCache } from './diagnostics'
-import { parseDependencies, isPackageJson, getDependencyAtPosition, getDependencyByName } from './parser'
-import { getPackageInfo } from './registry'
-import { analyzeVersion } from './semver-utils'
+import { ecosystemForDocument } from './ecosystem'
 
 
 export class DependencyHoverProvider implements vscode.HoverProvider {
@@ -18,35 +16,40 @@ export class DependencyHoverProvider implements vscode.HoverProvider {
     position: vscode.Position,
     _token: vscode.CancellationToken
   ): Promise<vscode.Hover | undefined> {
-    if (!isPackageJson(document)) return undefined
+    const ecosystem = ecosystemForDocument(document)
+    if (!ecosystem) return undefined
 
     const config = vscode.workspace.getConfiguration('trawl')
     if (!config.get<boolean>('enableHover', true)) return undefined
 
-    const deps = parseDependencies(document)
+    const deps = ecosystem.parseDependencies(document)
 
     // Check if hovering over a dep name or version
-    const depByName = getDependencyByName(document, position, deps)
-    const depByVersion = getDependencyAtPosition(document, position, deps)
+    const depByName = ecosystem.getDependencyAtName(document, position, deps)
+    const depByVersion = ecosystem.getDependencyAtVersion(document, position, deps)
     const dep = depByName || depByVersion
-
     if (!dep) return undefined
 
     // Try to get cached analysis first, otherwise fetch
     const docAnalysis = getAnalysisCache().get(document.uri.toString())
-    let cachedEntry = docAnalysis?.get(dep.name)
+    const cachedEntry = docAnalysis?.get(dep.name)
 
     let info = cachedEntry?.info
     let analysis = cachedEntry?.analysis
 
     if (!info) {
-      info = await getPackageInfo(dep.name) ?? undefined
+      try {
+        info = await ecosystem.getPackageInfo(dep.name) ?? undefined
+      }
+      catch {
+        return undefined
+      }
       if (!info) return undefined
-      analysis = analyzeVersion(dep.versionRange, info)
+      analysis = ecosystem.analyzeVersion(dep.versionRange, info)
     }
 
     if (!analysis) {
-      analysis = analyzeVersion(dep.versionRange, info)
+      analysis = ecosystem.analyzeVersion(dep.versionRange, info)
     }
 
     // Build the hover content
@@ -65,7 +68,7 @@ export class DependencyHoverProvider implements vscode.HoverProvider {
 
     // Version info table
     md.appendMarkdown('| | |\n|---|---|\n')
-    md.appendMarkdown(`| **Current range** | \`${dep.versionRange}\` |\n`)
+    md.appendMarkdown(`| **Current** | \`${dep.versionRange}\` |\n`)
 
     if (analysis.maxSatisfying) {
       md.appendMarkdown(`| **Max satisfying** | \`${analysis.maxSatisfying}\` |\n`)
@@ -93,17 +96,16 @@ export class DependencyHoverProvider implements vscode.HoverProvider {
       md.appendMarkdown(`| **Last published** | ${formatted} |\n`)
     }
 
-    md.appendMarkdown(`| **Group** | \`${dep.group}\` |\n`)
+    if (ecosystem.showGroup) {
+      md.appendMarkdown(`| **Group** | \`${dep.group}\` |\n`)
+    }
 
     md.appendMarkdown('\n---\n\n')
 
     // Links
-    md.appendMarkdown(`[npm](${info.npmUrl})`)
-    if (info.homepage && info.homepage !== info.npmUrl) {
-      md.appendMarkdown(` · [Homepage](${info.homepage})`)
-    }
+    md.appendMarkdown(ecosystem.hoverLinks(info))
 
-    // Hover range — cover the full key-value pair
+    // Hover range — cover the name or the version, whichever was hovered
     const hoverRange = depByName
       ? new vscode.Range(dep.line, dep.nameStartChar, dep.line, dep.nameEndChar)
       : new vscode.Range(dep.line, dep.versionStartChar, dep.line, dep.versionEndChar)

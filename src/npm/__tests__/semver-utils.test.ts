@@ -1,14 +1,15 @@
+import { PackageInfo } from '../../core/types'
 import { analyzeVersion, suggestVersionUpdate } from '../semver-utils'
-import { NpmPackageInfo } from '../types'
 
 
-function makePackageInfo(versions: string[], latest: string, time: Record<string, string> = {}): NpmPackageInfo {
+function makePackageInfo(versions: string[], latest: string, time: Record<string, string> = {}): PackageInfo {
   return {
     name: 'test-pkg',
     versions,
+    latest,
     distTags: { latest },
     time,
-    npmUrl: 'https://www.npmjs.com/package/test-pkg',
+    registryUrl: 'https://www.npmjs.com/package/test-pkg',
   }
 }
 
@@ -61,12 +62,13 @@ describe('analyzeVersion', () => {
   })
 
   it('handles missing latest gracefully', () => {
-    const info: NpmPackageInfo = {
+    const info: PackageInfo = {
       name: 'test-pkg',
       versions: ['1.0.0'],
+      latest: '',
       distTags: {},
       time: {},
-      npmUrl: 'https://www.npmjs.com/package/test-pkg',
+      registryUrl: 'https://www.npmjs.com/package/test-pkg',
     }
     const result = analyzeVersion('^1.0.0', info)
     expect(result.updateType).toBe('none')

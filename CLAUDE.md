@@ -1,6 +1,6 @@
 # Project Overview
 
-Trawl is a VS Code extension that provides zero-click outdated dependency warnings and version autocomplete for `package.json` files. Outdated deps surface as native VS Code diagnostics (Problems panel, editor underlines, file explorer decorations) - no toolbar button, no sidebar required.
+Trawl is a VS Code extension that provides zero-click outdated dependency warnings and version autocomplete for npm `package.json` files and Python `requirements*.txt` files. Outdated deps surface as native VS Code diagnostics (Problems panel, editor underlines, file explorer decorations) - no toolbar button, no sidebar required.
 
 ## Essential Commands
 
@@ -19,44 +19,65 @@ Press **F5** in VS Code to launch the Extension Development Host with the extens
 ### Tech Stack
 - TypeScript (strict mode, ES2022, CommonJS output)
 - VS Code Extension API (`vscode` 1.85+)
-- `semver` library for version comparison
+- `semver` library for npm version comparison; `@renovatebot/pep440` for Python (PEP 440) version comparison
 - esbuild for bundling (single output file: `dist/extension.js`)
-- Node.js `https` module for npm registry HTTP requests (no fetch, no axios)
+- Node.js `https` module for registry HTTP requests (no fetch, no axios)
 
 ### Key Directory Structure
-```
+
+The code is split into an ecosystem-agnostic **core** and one self-contained
+folder per ecosystem (`npm`, `python`). Core orchestration and providers never
+reference npm/PyPI directly — they go through the `Ecosystem` interface.
+
+```text
 src/
-├── extension.ts      # Entry point - registers all providers and commands
-├── types.ts          # Shared interfaces and constants (no runtime logic)
-├── parser.ts         # Parses package.json TextDocument, returns deps with exact char positions
-├── registry.ts       # npm registry HTTP client with TTL cache + request deduplication
-├── semver-utils.ts   # Version analysis (update type, suggested range)
-├── diagnostics.ts    # Core feature - zero-click diagnostic warnings
-├── code-actions.ts   # Quick-fix lightbulb actions (update, pin, open npm)
-├── completion.ts     # Autocomplete provider for version strings
-└── hover.ts          # Hover provider showing version info and npm links
+├── extension.ts            # Entry point - registers providers per ecosystem
+├── core/
+│   ├── types.ts            # Shared types + the Ecosystem interface
+│   ├── ecosystem.ts        # ECOSYSTEMS list + ecosystemForDocument() lookup
+│   ├── http.ts             # fetchJson() https helper
+│   ├── registry-cache.ts   # Generic TTL cache + dedup + prefetch + bg-refresh factory
+│   ├── diagnostics.ts      # Core feature - zero-click diagnostics (dispatches to ecosystem)
+│   ├── completion.ts       # Autocomplete provider (delegates item building)
+│   ├── hover.ts            # Hover provider (delegates links/labels)
+│   └── code-actions.ts     # Quick-fix actions (reads TrawlDiagnostic metadata)
+├── npm/                    # package.json parser, npm registry, semver-utils, presentation, index (npmEcosystem)
+└── python/                 # requirements.txt parser, PyPI registry, pep440-utils, presentation, index (pythonEcosystem)
 ```
+
+To add an ecosystem: create `src/<name>/` implementing the pieces, export an
+`Ecosystem` from its `index.ts`, and add it to `ECOSYSTEMS` in `core/ecosystem.ts`.
 
 ### Core Features
+
 - **Diagnostics**: Severity mapped to update type - major=Error, minor=Warning, patch=Info, prerelease=Hint
-- **Completion**: Real npm versions sorted newest-first, dist-tags included, replaces entire version string
-- **Hover**: Markdown table with current range, max satisfying, latest, publish date, and npm links
-- **Code Actions**: Update to latest (preserving `^`/`~` prefix), pin exact, open on npm
-- **Caching**: In-memory TTL cache with inflight deduplication and background refresh at 80% TTL
+- **Completion**: Real registry versions newest-first; npm offers `^`/exact/`~`/dist-tags, Python offers `==`/`>=`
+- **Hover**: Markdown table with current, max satisfying, latest, publish date, and registry links
+- **Code Actions**: Update to latest (preserving prefix/operator), pin exact, open on npm/PyPI
+- **Caching**: In-memory TTL cache with inflight deduplication and background refresh at 80% TTL (shared `registry-cache` factory, one instance per ecosystem)
 
 ### Import Paths
-Uses relative imports within `src/` - no path aliases. Example:
+
+Uses relative imports - no path aliases. Core imports from `./` within `core/`;
+ecosystem modules import the core via `../core/*`. Example:
+
 ```ts
-import { parseDependencies } from './parser'
-import { getPackageInfo } from './registry'
+import { createRegistryCache } from '../core/registry-cache'
+import { PackageInfo } from '../core/types'
 ```
 
 ### Configuration Namespace
+
 All VS Code settings use the `trawl.*` prefix (e.g. `trawl.cacheTTLMinutes`). When reading config, always use `vscode.workspace.getConfiguration('trawl')`.
 
 ## Testing Strategy
 
-No test suite exists yet. When adding tests, use Jest with the `@vscode/test-electron` runner. Place test files alongside source in `src/__tests__/`.
+Jest (`ts-jest`) is configured; run with `yarn test`. Tests live in per-module
+`__tests__/` folders (e.g. `src/python/__tests__/`) and match `**/__tests__/**/*.test.ts`.
+`vscode` is stubbed via `src/__mocks__/vscode.ts`, so prefer pure functions for
+parsing/version logic (e.g. `parseRequirements(text)`) to keep tests independent
+of the editor API. The ESM-only `@renovatebot/pep440` is transpiled via the Jest
+`transform`/`transformIgnorePatterns` config in `package.json`.
 
 ## Development Guidelines
 
@@ -71,7 +92,7 @@ No test suite exists yet. When adding tests, use Jest with the `@vscode/test-ele
 ### VS Code Extension Patterns
 - Register all disposables via `context.subscriptions.push(...)` - never leak disposables
 - Use `vscode.workspace.getConfiguration('trawl')` for all config reads
-- Diagnostics go through the shared `DiagnosticCollection` in `diagnostics.ts`
+- Diagnostics go through the shared `DiagnosticCollection` in `core/diagnostics.ts`
 - Analysis results are cached in the `analysisCache` Map and shared with hover/code-action providers to avoid redundant registry calls
 - The `TrawlDiagnostic` type extends `vscode.Diagnostic` with metadata fields (`_depName`, `_suggestedVersion`, etc.) for use by code actions
 

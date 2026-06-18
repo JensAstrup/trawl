@@ -1,8 +1,10 @@
 import * as http from 'http'
 import * as https from 'https'
 
-import { getPackageInfo, clearCache, setCacheTTL, prefetchPackages, scheduleBackgroundRefresh } from '../registry'
+import { npmRegistry } from '../registry'
 
+
+const { getPackageInfo, clearCache, setCacheTTL, prefetchPackages, scheduleBackgroundRefresh } = npmRegistry
 
 jest.mock('https')
 
@@ -58,16 +60,17 @@ beforeEach(() => {
 })
 
 describe('getPackageInfo', () => {
-  it('returns parsed NpmPackageInfo on successful fetch', async () => {
+  it('returns parsed PackageInfo on successful fetch', async () => {
     setupSuccessfulFetch()
     const result = await getPackageInfo('test-pkg')
     expect(result).not.toBeNull()
     expect(result?.name).toBe('test-pkg')
     expect(result?.versions).toEqual(['1.0.0', '1.1.0', '2.0.0'])
-    expect(result?.distTags.latest).toBe('2.0.0')
+    expect(result?.latest).toBe('2.0.0')
+    expect(result?.distTags?.latest).toBe('2.0.0')
     expect(result?.description).toBe('A test package')
     expect(result?.homepage).toBe('https://example.com')
-    expect(result?.npmUrl).toBe('https://www.npmjs.com/package/test-pkg')
+    expect(result?.registryUrl).toBe('https://www.npmjs.com/package/test-pkg')
   })
 
   it('returns null when npm returns 404', async () => {
@@ -113,7 +116,8 @@ describe('getPackageInfo', () => {
       const result = await getPackageInfo('test-pkg')
       expect(result).not.toBeNull()
       expect(result?.name).toBe('test-pkg')
-    } finally {
+    }
+    finally {
       Date.now = originalDateNow
     }
   })
